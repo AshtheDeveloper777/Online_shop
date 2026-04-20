@@ -1,0 +1,34 @@
+"""
+Script to update products with new images
+Run this once to update the database with new product images
+"""
+from app import app, db, Product
+
+with app.app_context():
+    # Delete all existing products
+    Product.query.delete()
+    db.session.commit()
+
+    # Create new products with real images
+    sample_products = [
+        Product(name='MacBook Pro 16"', description='Powerful laptop with M3 chip, 16GB RAM, 512GB SSD. Perfect for professionals and creatives.', price=2499.99, stock=15, category='Electronics', image_url='https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&h=600&fit=crop'),
+        Product(name='Wireless Gaming Mouse', description='Ergonomic wireless mouse with 12,000 DPI sensor, RGB lighting, and 50-hour battery life.', price=79.99, stock=50, category='Electronics', image_url='https://images.unsplash.com/photo-1527814050087-3793815479db?w=800&h=600&fit=crop'),
+        Product(name='Mechanical RGB Keyboard', description='Full RGB mechanical gaming keyboard with Cherry MX switches and aluminum frame.', price=149.99, stock=30, category='Electronics', image_url='https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&h=600&fit=crop'),
+        Product(name='Premium Gaming Headset', description='7.1 Surround sound wireless gaming headset with noise cancellation and RGB lighting.', price=199.99, stock=25, category='Electronics', image_url='https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=600&fit=crop'),
+        Product(name='Apple Watch Series 9', description='Latest smartwatch with fitness tracking, ECG, blood oxygen monitoring, and always-on display.', price=399.99, stock=20, category='Electronics', image_url='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=600&fit=crop'),
+        Product(name='USB-C Multi-Port Hub', description='7-in-1 USB-C hub with HDMI, USB 3.0 ports, SD card reader, and power delivery.', price=89.99, stock=40, category='Accessories', image_url='https://images.unsplash.com/photo-1587825143888-8645c8d3dac8?w=800&h=600&fit=crop'),
+        Product(name='Ergonomic Laptop Stand', description='Adjustable aluminum laptop stand with ventilation slots and cable management.', price=59.99, stock=35, category='Accessories', image_url='https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800&h=600&fit=crop'),
+        Product(name='4K Webcam Pro', description='1080p HD webcam with auto-focus, noise cancellation, and privacy shutter.', price=129.99, stock=20, category='Electronics', image_url='https://images.unsplash.com/photo-1587825143888-8645c8d3dac8?w=800&h=600&fit=crop'),
+        Product(name='Wireless Earbuds Pro', description='Premium wireless earbuds with active noise cancellation and 30-hour battery life.', price=179.99, stock=45, category='Electronics', image_url='https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=800&h=600&fit=crop'),
+        Product(name='Portable SSD 1TB', description='Ultra-fast external SSD with USB-C connectivity, perfect for backups and file transfers.', price=129.99, stock=30, category='Accessories', image_url='https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&h=600&fit=crop'),
+        Product(name='Monitor 27" 4K', description='27-inch 4K UHD monitor with HDR, 144Hz refresh rate, and USB-C connectivity.', price=449.99, stock=12, category='Electronics', image_url='https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&h=600&fit=crop'),
+        Product(name='Mechanical Keyboard TKL', description='Tenkeyless mechanical keyboard with RGB backlighting and premium keycaps.', price=119.99, stock=28, category='Electronics', image_url='https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&h=600&fit=crop'),
+    ]
+
+    for product in sample_products:
+        db.session.add(product)
+
+    db.session.commit()
+    print("Products updated successfully with new images!")
+    print(f"Created {len(sample_products)} products")
+

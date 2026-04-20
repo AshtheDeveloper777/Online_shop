@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout - E-Commerce Store{% endblock %}
+
+{% block extra_css %}
+<script src="https://js.stripe.com/v3/"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2 class="mb-4">Checkout</h2>
+
+    <div class="row">
+        <!-- Shipping Info -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Shipping Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if not order %}
+                    <form method="POST" id="shipping-form">
+                        <div class="mb-3">
+                            <label for="shipping_address" class="form-label">Shipping Address</label>
+                            <textarea class="form-control" id="shipping_address" name="shipping_address" rows="4" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100">Continue to Payment</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Items</h5>
+                </div>
+                <div class="card-body">
+                    {% for item in cart_items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <strong>{{ item.product.name }}</strong>
+                            <p class="text-muted small mb-0">Quantity: {{ item.quantity }}</p>
+                        </div>
+                        <strong>${{ "%.2f"|format(item.product.price * item.quantity) }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Payment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Subtotal:</span>
+                            <strong>${{ "%.2f"|format(total) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Shipping:</span>
+                            <strong>Free</strong>
+                        </div>
+
+                        {% if order %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Payment Method:</span>
+                            <strong class="text-success text-uppercase">{{ order.payment_method }}</strong>
+                        </div>
+                        {% endif %}
+
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span><strong>Total:</strong></span>
+                            <strong class="text-primary fs-4">${{ "%.2f"|format(total) }}</strong>
+                        </div>
+                    </div>
+
+                    <!-- Stripe Payment Form -->
+                    {% if order and client_secret and stripe_enabled %}
+                    <form id="payment-form">
+                        <div id="card-element" class="mb-3"></div>
+                        <div id="card-errors" role="alert" class="text-danger mb-3"></div>
+                        <button type="submit" id="submit-button" class="btn btn-primary btn-lg w-100">
+                            <span id="button-text">Pay ${{ "%.2f"|format(total) }}</span>
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    <!-- Razorpay Payment Button -->
+                    {% if order and razorpay_order_id and razorpay_enabled %}
+                    <form id="razorpay-form">
+                        <button id="rzp-button1" class="btn btn-success btn-lg w-100">
+                            Pay ₹{{ "%.2f"|format(total) }}
+                        </button>
+                    </form>
+                    {% elif order and razorpay_enabled %}
+                    <div class="alert alert-warning">Razorpay failed to initialize. Please try again or use another method.</div>
+                    {% endif %}
+
+                    <!-- Mock / Place order (when no payment gateway or Razorpay failed) -->
+                    {% if order and not stripe_enabled and (not razorpay_enabled or not razorpay_order_id) %}
+                    <form method="POST" action="{{ url_for('mock_payment', order_id=order.id) }}">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            Place Order — ${{ "%.2f"|format(total) }}
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stripe Script -->
+{% if order and client_secret and stripe_enabled %}
+<script>
+    const stripe = Stripe('{{ stripe_publishable_key }}');
+    const elements = stripe.elements();
+    const cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+
+    const form = document.getElementById('payment-form');
+    const submitButton = document.getElementById('submit-button');
+    const buttonText = document.getElementById('button-text');
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        submitButton.disabled = true;
+        buttonText.textContent = 'Processing...';
+
+        const {error, paymentIntent} = await stripe.confirmCardPayment('{{ client_secret }}', {
+            payment_method: { card: cardElement }
+        });
+
+        if (error) {
+            buttonText.textContent = 'Pay ${{ "%.2f"|format(total) }}';
+            submitButton.disabled = false;
+            document.getElementById('card-errors').textContent = error.message;
+        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+            window.location.href = '{{ url_for("payment_success") }}?payment_intent=' + paymentIntent.id;
+        }
+    });
+</script>
+{% endif %}
+
+<!-- Razorpay Script -->
+{% if order and razorpay_order_id and razorpay_enabled %}
+<script>
+    var options = {
+        "key": "{{ razorpay_key_id }}",
+        "amount": "{{ razorpay_amount }}",
+        "currency": "{{ razorpay_currency }}",
+        "name": "E-Commerce Store",
+        "description": "Order #{{ order.id }}",
+        "order_id": "{{ razorpay_order_id }}",
+        "handler": function (response){
+            fetch("{{ url_for('razorpay_payment_success') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature
+                })
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.success){
+                      window.location.href = "{{ url_for('orders') }}";
+                  } else {
+                      alert("Payment failed: " + data.error);
+                  }
+              });
+        },
+        "prefill": {
+            "name": "{{ current_user.username }}",
+            "email": "{{ current_user.email }}"
+        },
+        "theme": { "color": "#3399cc" }
+    };
+    var rzp1 = new Razorpay(options);
+    document.getElementById('rzp-button1').onclick = function(e){
+        rzp1.open();
+        e.preventDefault();
+    };
+</script>
+{% endif %}
+{% endblock %}

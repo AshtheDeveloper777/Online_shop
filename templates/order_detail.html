@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Order #{{ order.id }} - E-Commerce Store{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2 class="mb-4">Order Details #{{ order.id }}</h2>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Items</h5>
+                </div>
+                <div class="card-body">
+                    {% for item in order.items %}
+                    <div class="row align-items-center mb-3 pb-3 border-bottom">
+                        <div class="col-md-2">
+                            <img src="{{ item.product.image_url }}" class="img-fluid rounded" alt="{{ item.product.name }}">
+                        </div>
+                        <div class="col-md-6">
+                            <h6>{{ item.product.name }}</h6>
+                            <p class="text-muted small mb-0">Quantity: {{ item.quantity }}</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <strong>${{ "%.2f"|format(item.price * item.quantity) }}</strong>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if order.shipping_address %}
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Shipping Address</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ order.shipping_address }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>Order Date:</strong></p>
+                        <p class="text-muted">{{ order.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>Status:</strong></p>
+                        <span class="badge bg-{{ 'success' if order.status == 'processing' else 'warning' if order.status == 'pending' else 'info' }}">
+                            {{ order.status|title }}
+                        </span>
+                    </div>
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>Payment Status:</strong></p>
+                        <span class="badge bg-{{ 'success' if order.payment_status == 'completed' else 'warning' }}">
+                            {{ order.payment_status|title }}
+                        </span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <strong>${{ "%.2f"|format(order.total_amount) }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Shipping:</span>
+                        <strong>Free</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <span><strong>Total:</strong></span>
+                        <strong class="text-primary fs-4">${{ "%.2f"|format(order.total_amount) }}</strong>
+                    </div>
+                </div>
+            </div>
+            <a href="{{ url_for('orders') }}" class="btn btn-outline-secondary w-100 mt-3">Back to Orders</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

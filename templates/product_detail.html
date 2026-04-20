@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - E-Commerce Store{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-6">
+            <div style="position: relative; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                <img src="{{ product.image_url }}" class="img-fluid" alt="{{ product.name }}" style="width: 100%; height: 500px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/800x800/64748b/ffffff?text=No+Image'">
+                {% if product.stock > 0 %}
+                <span class="stock-badge" style="position: absolute; top: 1rem; right: 1rem;">In Stock</span>
+                {% else %}
+                <span class="stock-badge out-of-stock" style="position: absolute; top: 1rem; right: 1rem;">Out of Stock</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-6">
+            {% if product.category %}
+            <span class="badge bg-secondary mb-3">{{ product.category }}</span>
+            {% endif %}
+            <h1 class="mb-3 fw-bold" style="font-size: 2.5rem;">{{ product.name }}</h1>
+
+            <div class="d-flex align-items-center mb-3">
+                <div class="text-warning me-2">
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-fill"></i>
+                    <i class="bi bi-star-half"></i>
+                </div>
+                <span class="text-muted">(4.5) · 128 reviews</span>
+            </div>
+
+            <div class="mb-4">
+                <span class="price" style="font-size: 2.5rem; font-weight: 700; color: #2563eb;">${{ "%.2f"|format(product.price) }}</span>
+            </div>
+
+            <p class="lead mb-4" style="font-size: 1.1rem; line-height: 1.8; color: #64748b;">{{ product.description }}</p>
+
+            <div class="mb-4 p-3" style="background: #f8fafc; border-radius: 12px; border-left: 4px solid #10b981;">
+                <p class="mb-0">
+                    <strong>Availability:</strong>
+                    {% if product.stock > 0 %}
+                        <span class="text-success fw-bold">{{ product.stock }} units in stock</span>
+                    {% else %}
+                        <span class="text-danger fw-bold">Out of stock</span>
+                    {% endif %}
+                </p>
+            </div>
+
+            {% if current_user.is_authenticated %}
+            <form method="POST" action="{{ url_for('add_to_cart', product_id=product.id) }}" class="mb-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-auto">
+                        <label for="quantity" class="form-label">Quantity:</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" value="1" min="1" max="{{ product.stock }}" required>
+                    </div>
+                    <div class="col-auto">
+                        {% if product.stock > 0 %}
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-cart-plus"></i> Add to Cart
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-secondary btn-lg" disabled>Out of Stock</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-info">
+                <a href="{{ url_for('login') }}" class="alert-link">Login</a> to add items to your cart.
+            </div>
+            {% endif %}
+
+            <div class="mt-4 p-4" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 16px;">
+                <h5 class="fw-bold mb-3">Why Choose Us?</h5>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong>Free Shipping</strong> on orders over $50
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong>30-Day Return</strong> policy - no questions asked
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong>Secure Payment</strong> - 100% protected transactions
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong>Warranty</strong> - 1 year manufacturer warranty
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong>24/7 Support</strong> - Customer service always available
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
