@@ -12,16 +12,32 @@ import hmac
 import hashlib
 from datetime import datetime
 from sqlalchemy import text
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 load_dotenv()
 
 app = Flask(__name__)
 
+
+def normalize_database_url(database_url):
+    if not database_url:
+        return "sqlite:///shop.db"
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    if database_url.startswith("postgresql://"):
+        parsed = urlsplit(database_url)
+        allowed_params = {"sslmode", "sslcert", "sslkey", "sslrootcert", "connect_timeout", "application_name"}
+        filtered_query = urlencode(
+            [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key in allowed_params]
+        )
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, filtered_query, parsed.fragment))
+    return database_url
+
 # ========================
 # BASIC CONFIG
 # ========================
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "change-this-in-production")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///shop.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = normalize_database_url(os.getenv("DATABASE_URL"))
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_HTTPONLY"] = True
@@ -531,6 +547,22 @@ def _order_to_dict(order):
     }
 
 
+def _finalize_paid_order(order, user_id):
+    """Mark order as paid, deduct stock once, and clear user's cart."""
+    if order.payment_status == "completed":
+        return
+    for item in order.items:
+        product = Product.query.get(item.product_id)
+        if not product or product.stock < item.quantity:
+            raise ValueError(f"Insufficient stock for {item.product.name if item.product else 'product'}")
+    for item in order.items:
+        product = Product.query.get(item.product_id)
+        product.stock -= item.quantity
+    order.payment_status = "completed"
+    order.status = "processing"
+    CartItem.query.filter_by(user_id=user_id).delete()
+
+
 @app.route("/api/health")
 def api_health():
     db_ok = True
@@ -539,6 +571,16 @@ def api_health():
     except Exception:
         db_ok = False
     return jsonify({"ok": True, "service": "online-shop-api", "database_ok": db_ok})
+
+
+@app.route("/api/payments/config")
+def api_payments_config():
+    return jsonify(
+        {
+            "razorpay_enabled": RAZORPAY_ENABLED,
+            "razorpay_key_id": RAZORPAY_KEY_ID if RAZORPAY_ENABLED else "",
+        }
+    )
 
 
 @app.route("/api/auth/me")
@@ -704,6 +746,7 @@ def api_remove_cart_item(cart_item_id):
 def api_checkout():
     data = request.get_json() or {}
     shipping_address = (data.get("shipping_address") or "").strip()
+    payment_method = (data.get("payment_method") or "mock").strip().lower()
     if not shipping_address:
         return jsonify({"error": "Shipping address is required"}), 400
     cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
@@ -717,14 +760,13 @@ def api_checkout():
         user_id=current_user.id,
         total_amount=total,
         shipping_address=shipping_address,
-        status="processing",
-        payment_status="completed",
-        payment_method="mock",
+        status="pending",
+        payment_status="pending",
+        payment_method=payment_method if payment_method in {"mock", "razorpay"} else "mock",
     )
     db.session.add(order)
     db.session.flush()
     for cart_item in cart_items:
-        cart_item.product.stock -= cart_item.quantity
         db.session.add(
             OrderItem(
                 order_id=order.id,
@@ -733,9 +775,77 @@ def api_checkout():
                 price=cart_item.product.price,
             )
         )
-    CartItem.query.filter_by(user_id=current_user.id).delete()
+    if payment_method == "razorpay":
+        if not RAZORPAY_ENABLED or not razorpay_client:
+            db.session.rollback()
+            return jsonify({"error": "Razorpay not configured on server"}), 400
+        amount_paise = int(round(total * 100))
+        try:
+            rz_order = razorpay_client.order.create(
+                data={
+                    "amount": amount_paise,
+                    "currency": "INR",
+                    "receipt": f"order_{order.id}",
+                }
+            )
+        except Exception as exc:
+            db.session.rollback()
+            return jsonify({"error": f"Failed to create Razorpay order: {str(exc)}"}), 500
+        order.razorpay_order_id = rz_order["id"]
+        db.session.commit()
+        return jsonify(
+            {
+                "message": "Razorpay order created",
+                "requires_action": True,
+                "payment": {
+                    "provider": "razorpay",
+                    "key_id": RAZORPAY_KEY_ID,
+                    "amount": amount_paise,
+                    "currency": "INR",
+                    "order_id": rz_order["id"],
+                },
+                "order": _order_to_dict(order),
+            }
+        )
+    _finalize_paid_order(order, current_user.id)
+    order.payment_method = "mock"
     db.session.commit()
-    return jsonify({"message": "Order placed", "order": _order_to_dict(order)})
+    return jsonify({"message": "Order placed", "requires_action": False, "order": _order_to_dict(order)})
+
+
+@app.route("/api/payments/razorpay/verify", methods=["POST"])
+@login_required
+def api_razorpay_verify():
+    if not RAZORPAY_ENABLED or not razorpay_client:
+        return jsonify({"error": "Razorpay not configured"}), 400
+    data = request.get_json() or {}
+    razorpay_order_id = data.get("razorpay_order_id")
+    razorpay_payment_id = data.get("razorpay_payment_id")
+    razorpay_signature = data.get("razorpay_signature")
+    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+        return jsonify({"error": "Missing payment details"}), 400
+    order = Order.query.filter_by(razorpay_order_id=razorpay_order_id).first()
+    if not order or order.user_id != current_user.id:
+        return jsonify({"error": "Order not found"}), 404
+    try:
+        razorpay_client.utility.verify_payment_signature(
+            {
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_signature": razorpay_signature,
+            }
+        )
+        _finalize_paid_order(order, current_user.id)
+        order.razorpay_payment_id = razorpay_payment_id
+        order.payment_method = "razorpay"
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Payment verification failed"}), 400
+    return jsonify({"message": "Payment verified", "order": _order_to_dict(order)})
 
 
 @app.route("/api/orders")
@@ -779,15 +889,54 @@ def react_assets(path):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        if Product.query.count() == 0:
-            db.session.add_all(
-                [
-                    Product(name="Premium Headphones", description="Wireless ANC headphones.", price=149.99, stock=50, category="Electronics"),
-                    Product(name="Smart Watch", description="Health tracking and notifications.", price=199.99, stock=35, category="Electronics"),
-                    Product(name="Minimal Backpack", description="Water-resistant urban backpack.", price=89.99, stock=40, category="Fashion"),
-                    Product(name="Coffee Beans", description="Single-origin medium roast.", price=17.50, stock=100, category="Grocery"),
-                ]
-            )
+        sample_products = [
+            {"name": "Premium Headphones", "description": "Wireless ANC headphones.", "price": 149.99, "stock": 50, "category": "Electronics"},
+            {"name": "Smart Watch", "description": "Health tracking and notifications.", "price": 199.99, "stock": 35, "category": "Electronics"},
+            {"name": "4K Monitor 27 inch", "description": "Ultra HD IPS monitor for creators and gaming.", "price": 289.00, "stock": 24, "category": "Electronics"},
+            {"name": "Gaming Mouse", "description": "RGB wired mouse with programmable buttons.", "price": 39.99, "stock": 90, "category": "Electronics"},
+            {"name": "Bluetooth Speaker", "description": "Portable waterproof speaker with deep bass.", "price": 59.50, "stock": 70, "category": "Electronics"},
+            {"name": "Mechanical Keyboard", "description": "Hot-swappable keyboard with tactile switches.", "price": 99.99, "stock": 48, "category": "Electronics"},
+            {"name": "Minimal Backpack", "description": "Water-resistant urban backpack.", "price": 89.99, "stock": 40, "category": "Fashion"},
+            {"name": "Classic Denim Jacket", "description": "Comfort fit denim jacket for all seasons.", "price": 74.90, "stock": 38, "category": "Fashion"},
+            {"name": "Running Shoes", "description": "Lightweight shoes with responsive cushioning.", "price": 119.95, "stock": 60, "category": "Fashion"},
+            {"name": "Cotton Hoodie", "description": "Soft fleece hoodie for everyday wear.", "price": 44.99, "stock": 85, "category": "Fashion"},
+            {"name": "Leather Wallet", "description": "Genuine leather wallet with RFID protection.", "price": 34.99, "stock": 110, "category": "Fashion"},
+            {"name": "Ceramic Dinner Set", "description": "12-piece modern ceramic dinnerware set.", "price": 79.99, "stock": 25, "category": "Home"},
+            {"name": "Air Fryer", "description": "5L digital air fryer with preset modes.", "price": 129.00, "stock": 32, "category": "Home"},
+            {"name": "Memory Foam Pillow", "description": "Orthopedic pillow for neck support.", "price": 29.99, "stock": 140, "category": "Home"},
+            {"name": "Table Lamp", "description": "Dimmable LED lamp with USB charging port.", "price": 25.50, "stock": 75, "category": "Home"},
+            {"name": "Vacuum Cleaner", "description": "Bagless vacuum with HEPA filtration.", "price": 179.00, "stock": 21, "category": "Home"},
+            {"name": "Coffee Beans", "description": "Single-origin medium roast.", "price": 17.50, "stock": 100, "category": "Grocery"},
+            {"name": "Organic Honey", "description": "Raw natural honey from mountain farms.", "price": 14.99, "stock": 120, "category": "Grocery"},
+            {"name": "Green Tea Pack", "description": "Premium green tea, 100 tea bags.", "price": 12.75, "stock": 150, "category": "Grocery"},
+            {"name": "Protein Oats", "description": "High-fiber oats blend with added protein.", "price": 9.99, "stock": 130, "category": "Grocery"},
+            {"name": "Travel Bottle Set", "description": "Leakproof toiletry bottles for travel.", "price": 11.95, "stock": 95, "category": "Essentials"},
+            {"name": "Yoga Mat", "description": "Non-slip yoga mat with carry strap.", "price": 27.99, "stock": 67, "category": "Sports"},
+            {"name": "Dumbbell Set", "description": "Adjustable dumbbell set for home workouts.", "price": 159.00, "stock": 18, "category": "Sports"},
+            {"name": "Cricket Kit", "description": "Starter cricket kit with bat and pads.", "price": 89.00, "stock": 26, "category": "Sports"},
+            {"name": "Smart Ring", "description": "Compact wellness tracker with sleep analytics.", "price": 219.00, "stock": 30, "category": "Electronics"},
+            {"name": "USB-C Dock", "description": "8-in-1 docking station for laptops and tablets.", "price": 69.99, "stock": 52, "category": "Electronics"},
+            {"name": "Portable SSD 1TB", "description": "High-speed external SSD for creators.", "price": 99.00, "stock": 44, "category": "Electronics"},
+            {"name": "Noise Isolating Earbuds", "description": "Lightweight earbuds with deep bass profile.", "price": 45.00, "stock": 78, "category": "Electronics"},
+            {"name": "Oversized T-shirt", "description": "Relaxed fit tee for daily streetwear style.", "price": 21.50, "stock": 95, "category": "Fashion"},
+            {"name": "Slim Formal Shirt", "description": "Wrinkle-resistant formal shirt.", "price": 38.00, "stock": 58, "category": "Fashion"},
+            {"name": "Athletic Joggers", "description": "Breathable joggers with zip pockets.", "price": 36.75, "stock": 76, "category": "Fashion"},
+            {"name": "Kitchen Knife Set", "description": "Professional stainless steel chef knife set.", "price": 64.00, "stock": 39, "category": "Home"},
+            {"name": "Robot Vacuum", "description": "Smart mapping robot vacuum cleaner.", "price": 299.00, "stock": 20, "category": "Home"},
+            {"name": "Bathroom Organizer", "description": "Space-saving rack with anti-rust body.", "price": 19.99, "stock": 112, "category": "Home"},
+            {"name": "Protein Powder", "description": "Whey isolate vanilla blend, 1kg.", "price": 34.99, "stock": 88, "category": "Grocery"},
+            {"name": "Almond Butter", "description": "Natural almond butter with no sugar.", "price": 13.49, "stock": 84, "category": "Grocery"},
+            {"name": "Electrolyte Drink Mix", "description": "Hydration powder for workouts.", "price": 16.20, "stock": 73, "category": "Grocery"},
+            {"name": "Laptop Sleeve", "description": "Shockproof 14-inch laptop sleeve.", "price": 18.90, "stock": 120, "category": "Essentials"},
+            {"name": "Cable Organizer Kit", "description": "Desk cable clips and ties pack.", "price": 8.99, "stock": 160, "category": "Essentials"},
+            {"name": "Resistance Bands", "description": "Set of 5 resistance bands for training.", "price": 15.99, "stock": 93, "category": "Sports"},
+            {"name": "Foam Roller", "description": "Deep tissue roller for recovery sessions.", "price": 24.50, "stock": 61, "category": "Sports"},
+            {"name": "Skipping Rope Pro", "description": "Adjustable speed rope with bearings.", "price": 12.99, "stock": 109, "category": "Sports"},
+        ]
+        existing_names = {name for (name,) in db.session.query(Product.name).all()}
+        new_products = [Product(**item) for item in sample_products if item["name"] not in existing_names]
+        if new_products:
+            db.session.add_all(new_products)
             db.session.commit()
 
     port = int(os.getenv("PORT", "5000"))

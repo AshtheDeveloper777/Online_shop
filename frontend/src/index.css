@@ -1,10 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  background: #f3f4f6;
-  color: #111827;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  background: radial-gradient(circle at 20% 10%, #21134a 0%, #070812 45%, #03040a 100%);
+  color: #eef1ff;
 }
 
 #root {
   min-height: 100vh;
+}
+
+.glass {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+.neon-text {
+  text-shadow: 0 0 14px rgba(129, 140, 248, 0.65);
+}
+
+.neon-border {
+  box-shadow:
+    0 0 0 1px rgba(129, 140, 248, 0.4),
+    0 0 30px rgba(59, 130, 246, 0.2),
+    0 0 48px rgba(236, 72, 153, 0.16);
+}
+
+.float-card {
+  transform-style: preserve-3d;
+  animation: hoverFloat 5s ease-in-out infinite;
+}
+
+.float-card:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.float-card:nth-child(3) {
+  animation-delay: 1s;
+}
+
+.voice-bar {
+  animation: voicePulse 1.2s ease-in-out infinite;
+}
+
+.voice-bar:nth-child(2) { animation-delay: 0.12s; }
+.voice-bar:nth-child(3) { animation-delay: 0.24s; }
+.voice-bar:nth-child(4) { animation-delay: 0.36s; }
+.voice-bar:nth-child(5) { animation-delay: 0.48s; }
+.voice-bar:nth-child(6) { animation-delay: 0.6s; }
+
+.world-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.world-section::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(circle at center, rgba(59, 130, 246, 0.16), transparent 55%);
+  animation: worldSpin 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hoverFloat {
+  0%, 100% { transform: translateY(0px) rotateX(0deg); }
+  50% { transform: translateY(-10px) rotateX(4deg); }
+}
+
+@keyframes voicePulse {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes worldSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
