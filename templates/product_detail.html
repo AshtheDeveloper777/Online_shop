@@ -7,7 +7,7 @@
     <div class="row">
         <div class="col-md-6">
             <div style="position: relative; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-                <img src="{{ product.image_url }}" class="img-fluid" alt="{{ product.name }}" style="width: 100%; height: 500px; object-fit: cover;" onerror="this.src='https://via.placeholder.com/800x800/64748b/ffffff?text=No+Image'">
+                <img src="{{ product.image_url }}" class="img-fluid" alt="{{ product.name }}" style="width: 100%; height: 500px; object-fit: cover;" onerror="this.src='https://placehold.co/800x800/2563eb/ffffff?text=Product+Image'">
                 {% if product.stock > 0 %}
                 <span class="stock-badge" style="position: absolute; top: 1rem; right: 1rem;">In Stock</span>
                 {% else %}
@@ -20,7 +20,7 @@
             <span class="badge bg-secondary mb-3">{{ product.category }}</span>
             {% endif %}
             <h1 class="mb-3 fw-bold" style="font-size: 2.5rem;">{{ product.name }}</h1>
-
+            
             <div class="d-flex align-items-center mb-3">
                 <div class="text-warning me-2">
                     <i class="bi bi-star-fill"></i>
@@ -31,16 +31,16 @@
                 </div>
                 <span class="text-muted">(4.5) · 128 reviews</span>
             </div>
-
+            
             <div class="mb-4">
                 <span class="price" style="font-size: 2.5rem; font-weight: 700; color: #2563eb;">${{ "%.2f"|format(product.price) }}</span>
             </div>
-
+            
             <p class="lead mb-4" style="font-size: 1.1rem; line-height: 1.8; color: #64748b;">{{ product.description }}</p>
-
+            
             <div class="mb-4 p-3" style="background: #f8fafc; border-radius: 12px; border-left: 4px solid #10b981;">
                 <p class="mb-0">
-                    <strong>Availability:</strong>
+                    <strong>Availability:</strong> 
                     {% if product.stock > 0 %}
                         <span class="text-success fw-bold">{{ product.stock }} units in stock</span>
                     {% else %}
