@@ -39,7 +39,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 IS_VERCEL = bool(os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'))
 
-if IS_VERCEL:
+db_url = os.environ.get('DATABASE_URL')
+
+if db_url:
+    # Fix legacy postgres:// scheme to postgresql:// for SQLAlchemy
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+    app.config['UPLOAD_FOLDER'] = '/tmp/static/uploads' if IS_VERCEL else 'static/uploads'
+elif IS_VERCEL:
     db_path = '/tmp/ecommerce.db'
     src_db = os.path.join(os.path.dirname(__file__), 'instance', 'ecommerce.db')
     if not os.path.exists(src_db):
@@ -55,7 +63,7 @@ if IS_VERCEL:
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['UPLOAD_FOLDER'] = '/tmp/static/uploads'
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///ecommerce.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ecommerce.db'
     app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
 # Initialize extensions
