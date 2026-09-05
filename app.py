@@ -486,6 +486,8 @@ def checkout():
                                  stripe_enabled=False,
                                  razorpay_order_id=razorpay_order_id,
                                  razorpay_key_id=RAZORPAY_KEY_ID if razorpay_success else '',
+                                 razorpay_amount=int(total * 100),
+                                 razorpay_currency='INR',
                                  razorpay_enabled=razorpay_success)
     
     return render_template('checkout.html', 
@@ -494,6 +496,8 @@ def checkout():
                          stripe_publishable_key=STRIPE_PUBLISHABLE_KEY if STRIPE_ENABLED else '',
                          stripe_enabled=STRIPE_ENABLED,
                          razorpay_key_id=RAZORPAY_KEY_ID if RAZORPAY_ENABLED else '',
+                         razorpay_amount=int(total * 100),
+                         razorpay_currency='INR',
                          razorpay_enabled=RAZORPAY_ENABLED)
 
 @app.route('/create_razorpay_order', methods=['POST'])
