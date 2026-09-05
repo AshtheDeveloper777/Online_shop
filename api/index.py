@@ -31,11 +31,31 @@ with app.app_context():
     try:
         try:
             with db.engine.begin() as conn:
+                # User table migrations
+                conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS username VARCHAR(80);'))
+                conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS email VARCHAR(120);'))
                 conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);'))
+                conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
+                
+                # Product table migrations
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS name VARCHAR(100);'))
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS description TEXT;'))
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS price FLOAT;'))
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS image_url VARCHAR(255);'))
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS stock INTEGER DEFAULT 0;'))
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS category VARCHAR(50);'))
+                conn.execute(db.text('ALTER TABLE "product" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
+
+                # Order table migrations
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS total_amount FLOAT;'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT \'pending\';'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS shipping_address TEXT;'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT \'pending\';'))
                 conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT \'mock\';'))
                 conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255);'))
                 conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(255);'))
                 conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(255);'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;'))
         except Exception as mig_err:
             print(f"Schema migration note: {mig_err}")
 
