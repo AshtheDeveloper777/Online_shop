@@ -130,10 +130,25 @@ def ensure_db_initialized():
                     }
                     for p in old_products:
                         p.image_url = url_map.get(p.name, 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&auto=format&fit=crop&q=80')
-                    db.session.commit()
             _db_initialized = True
         except Exception as e:
             print(f"Error in ensure_db_initialized: {e}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            _db_initialized = True
+
+@app.errorhandler(500)
+def handle_500_error(e):
+    import traceback
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+    error_trace = traceback.format_exc()
+    print(f"500 Internal Error: {e}\n{error_trace}")
+    return f"<h1>500 Internal Server Error</h1><p><b>Error Details:</b> {e}</p><pre>{error_trace}</pre>", 500
 
 # Payment Gateway Configuration
 
