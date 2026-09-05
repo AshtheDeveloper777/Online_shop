@@ -26,9 +26,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db, Product
 
-# Initialize DB tables and sample data on serverless startup
+# Initialize DB tables, schema migrations and sample data on serverless startup
 with app.app_context():
     try:
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT \'mock\';'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255);'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(255);'))
+                conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(255);'))
+        except Exception as mig_err:
+            print(f"Schema migration note: {mig_err}")
+
         db.create_all()
         if Product.query.count() == 0:
             sample_products = [
@@ -48,26 +58,6 @@ with app.app_context():
             for product in sample_products:
                 db.session.add(product)
             db.session.commit()
-        else:
-            old_products = Product.query.filter(Product.image_url.like('%via.placeholder.com%')).all()
-            if old_products:
-                url_map = {
-                    'MacBook Pro 16"': 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80',
-                    'Wireless Gaming Mouse': 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=800&auto=format&fit=crop&q=80',
-                    'Mechanical RGB Keyboard': 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800&auto=format&fit=crop&q=80',
-                    'Premium Gaming Headset': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
-                    'Apple Watch Series 9': 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=800&auto=format&fit=crop&q=80',
-                    'USB-C Multi-Port Hub': 'https://images.unsplash.com/photo-1625842268584-8f3296236761?w=800&auto=format&fit=crop&q=80',
-                    'Ergonomic Laptop Stand': 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800&auto=format&fit=crop&q=80',
-                    '4K Webcam Pro': 'https://images.unsplash.com/photo-1585060544812-6b45742d762f?w=800&auto=format&fit=crop&q=80',
-                    'Wireless Earbuds Pro': 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&auto=format&fit=crop&q=80',
-                    'Portable SSD 1TB': 'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=800&auto=format&fit=crop&q=80',
-                    'Monitor 27" 4K': 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&auto=format&fit=crop&q=80',
-                    'Mechanical Keyboard TKL': 'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=800&auto=format&fit=crop&q=80',
-                }
-                for p in old_products:
-                    p.image_url = url_map.get(p.name, 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&auto=format&fit=crop&q=80')
-                db.session.commit()
     except Exception as e:
         print(f"DB initialization notice: {e}")
 

@@ -91,6 +91,17 @@ def ensure_db_initialized():
     global _db_initialized
     if not _db_initialized:
         try:
+            # Auto-migrate missing columns for existing PostgreSQL / Supabase tables
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);'))
+                    conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT \'mock\';'))
+                    conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255);'))
+                    conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(255);'))
+                    conn.execute(db.text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(255);'))
+            except Exception as mig_err:
+                print(f"Schema migration note: {mig_err}")
+
             db.create_all()
             if Product.query.count() == 0:
                 sample_products = [
