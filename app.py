@@ -64,6 +64,42 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# Inject cart_count into all rendered templates automatically
+@app.context_processor
+def inject_cart_count():
+    cart_count = 0
+    if current_user.is_authenticated:
+        try:
+            cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
+            cart_count = sum(item.quantity for item in cart_items)
+        except Exception:
+            cart_count = 0
+    return dict(cart_count=cart_count)
+
+_db_initialized = False
+
+@app.before_request
+def ensure_db_initialized():
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            db.create_all()
+            if Product.query.count() == 0:
+                sample_products = [
+                    Product(name='MacBook Pro 16"', description='Powerful laptop with M3 chip, 16GB RAM, 512GB SSD.', price=2499.99, stock=15, category='Electronics', image_url='https://via.placeholder.com/800x600/2563eb/ffffff?text=MacBook+Pro+16'),
+                    Product(name='Wireless Gaming Mouse', description='Ergonomic wireless mouse with 12,000 DPI sensor.', price=79.99, stock=50, category='Electronics', image_url='https://via.placeholder.com/800x600/7c3aed/ffffff?text=Gaming+Mouse'),
+                    Product(name='Mechanical RGB Keyboard', description='Full RGB mechanical gaming keyboard.', price=149.99, stock=30, category='Electronics', image_url='https://via.placeholder.com/800x600/a855f7/ffffff?text=RGB+Keyboard'),
+                    Product(name='Premium Gaming Headset', description='7.1 Surround sound wireless gaming headset.', price=199.99, stock=25, category='Electronics', image_url='https://via.placeholder.com/800x600/ec4899/ffffff?text=Gaming+Headset'),
+                    Product(name='Apple Watch Series 9', description='Latest smartwatch with fitness tracking.', price=399.99, stock=20, category='Electronics', image_url='https://via.placeholder.com/800x600/10b981/ffffff?text=Apple+Watch'),
+                    Product(name='USB-C Multi-Port Hub', description='7-in-1 USB-C hub with HDMI and USB 3.0.', price=89.99, stock=40, category='Accessories', image_url='https://via.placeholder.com/800x600/64748b/ffffff?text=USB-C+Hub'),
+                ]
+                for product in sample_products:
+                    db.session.add(product)
+                db.session.commit()
+            _db_initialized = True
+        except Exception as e:
+            print(f"Error in ensure_db_initialized: {e}")
+
 # Payment Gateway Configuration
 
 # Stripe configuration (use test keys)
