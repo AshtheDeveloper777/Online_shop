@@ -1,0 +1,17 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="Flask" />
+          <option value="Flask-Bootstrap5" />
+          <option value="Flask-WTF" />
+          <option value="Flask-SQLAlchemy" />
+          <option value="gunicorn" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

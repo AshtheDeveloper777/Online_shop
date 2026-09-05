@@ -1,5 +1,17 @@
-import os
 import sys
+import os
+import types
+
+# Polyfill pkg_resources for Python 3.12 / Vercel runtime if setuptools is not loaded
+try:
+    import pkg_resources
+except ImportError:
+    class DummyDistribution:
+        version = "1.4.2"
+    
+    pkg_resources = types.ModuleType("pkg_resources")
+    pkg_resources.get_distribution = lambda name: DummyDistribution()
+    sys.modules["pkg_resources"] = pkg_resources
 
 # Ensure parent directory is in python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
