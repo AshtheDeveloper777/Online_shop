@@ -5,22 +5,32 @@ import types
 # Robust pkg_resources polyfill for Python 3.12 / Vercel runtime
 try:
     import pkg_resources
-    if not hasattr(pkg_resources, 'DistributionNotFound'):
-        class DummyDistributionNotFound(Exception):
-            pass
-        pkg_resources.DistributionNotFound = DummyDistributionNotFound
-except ImportError:
-    class DummyDistributionNotFound(Exception):
-        pass
-
-    class DummyDistribution:
-        version = "1.4.2"
-
+except Exception:
+    import types
     pkg_resources = types.ModuleType("pkg_resources")
-    pkg_resources.DistributionNotFound = DummyDistributionNotFound
-    pkg_resources.get_distribution = lambda name: DummyDistribution()
     sys.modules["pkg_resources"] = pkg_resources
 
+class _DummyDistribution:
+    def __init__(self, name="dummy", version="2.0.0"):
+        self.name = name
+        self.version = version
+
+if not hasattr(pkg_resources, 'DistributionNotFound'):
+    class _DummyDistributionNotFound(Exception):
+        pass
+    pkg_resources.DistributionNotFound = _DummyDistributionNotFound
+
+if not hasattr(pkg_resources, 'get_distribution'):
+    pkg_resources.get_distribution = lambda name: _DummyDistribution(name=name)
+
+if not hasattr(pkg_resources, 'require'):
+    pkg_resources.require = lambda *args, **kwargs: [_DummyDistribution()]
+
+if not hasattr(pkg_resources, 'resource_filename'):
+    pkg_resources.resource_filename = lambda package_or_requirement, resource_name: resource_name
+
+if not hasattr(pkg_resources, 'declare_namespace'):
+    pkg_resources.declare_namespace = lambda name: None
 # Ensure parent directory is in python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
