@@ -475,6 +475,7 @@ def checkout():
                     razorpay_success = True
                 except Exception as e:
                     print(f"Razorpay order creation fallback: {e}")
+                    flash("Note: Add RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET to Vercel Environment Variables to activate live Razorpay UPI/Card checkout.", "info")
                     razorpay_success = False
 
             # Render checkout with payment options
