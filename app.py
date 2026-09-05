@@ -377,35 +377,35 @@ def checkout():
                 flash(f'Payment error: {str(e)}. Using mock payment instead.', 'warning')
                 # Fall through to mock payment
         else:
-        # Try creating Razorpay order if Razorpay is enabled
-        razorpay_order_id = None
-        razorpay_success = False
-        if RAZORPAY_ENABLED and razorpay_client:
-            try:
-                razorpay_order = razorpay_client.order.create({
-                    'amount': int(total * 100),  # Convert to paise
-                    'currency': 'INR',
-                    'receipt': f'order_{order.id}'
-                })
-                razorpay_order_id = razorpay_order['id']
-                order.razorpay_order_id = razorpay_order_id
-                order.payment_method = 'razorpay'
-                db.session.commit()
-                razorpay_success = True
-            except Exception as e:
-                print(f"Razorpay order creation fallback: {e}")
-                razorpay_success = False
+            # Try creating Razorpay order if Razorpay is enabled
+            razorpay_order_id = None
+            razorpay_success = False
+            if RAZORPAY_ENABLED and razorpay_client:
+                try:
+                    razorpay_order = razorpay_client.order.create({
+                        'amount': int(total * 100),  # Convert to paise
+                        'currency': 'INR',
+                        'receipt': f'order_{order.id}'
+                    })
+                    razorpay_order_id = razorpay_order['id']
+                    order.razorpay_order_id = razorpay_order_id
+                    order.payment_method = 'razorpay'
+                    db.session.commit()
+                    razorpay_success = True
+                except Exception as e:
+                    print(f"Razorpay order creation fallback: {e}")
+                    razorpay_success = False
 
-        # Render checkout with payment options
-        return render_template('checkout.html', 
-                             order=order, 
-                             cart_items=cart_items,
-                             total=total,
-                             stripe_publishable_key='',
-                             stripe_enabled=False,
-                             razorpay_order_id=razorpay_order_id,
-                             razorpay_key_id=RAZORPAY_KEY_ID if razorpay_success else '',
-                             razorpay_enabled=razorpay_success)
+            # Render checkout with payment options
+            return render_template('checkout.html', 
+                                 order=order, 
+                                 cart_items=cart_items,
+                                 total=total,
+                                 stripe_publishable_key='',
+                                 stripe_enabled=False,
+                                 razorpay_order_id=razorpay_order_id,
+                                 razorpay_key_id=RAZORPAY_KEY_ID if razorpay_success else '',
+                                 razorpay_enabled=razorpay_success)
     
     return render_template('checkout.html', 
                          cart_items=cart_items, 
