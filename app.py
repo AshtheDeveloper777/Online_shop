@@ -198,8 +198,8 @@ else:
     stripe.api_key = None
 
 # Razorpay configuration (for UPI, Cards, Wallets, Netbanking)
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_S8B6b25tETdizs')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '7K3XLSsfsZGqrBleXHe5bVHq')
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_S8B6b25tETdizs').strip().strip("'\"")
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '7K3XLSsfsZGqrBleXHe5bVHq').strip().strip("'\"")
 
 # Check if Razorpay is configured
 RAZORPAY_ENABLED = bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET and 
@@ -475,7 +475,7 @@ def checkout():
                     razorpay_success = True
                 except Exception as e:
                     print(f"Razorpay order creation fallback: {e}")
-                    flash("Note: Add RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET to Vercel Environment Variables to activate live Razorpay UPI/Card checkout.", "info")
+                    flash(f"Razorpay API Notice: {e}. Check your RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET in Vercel.", "warning")
                     razorpay_success = False
 
             # Render checkout with payment options
