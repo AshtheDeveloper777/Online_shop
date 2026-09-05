@@ -2,14 +2,22 @@ import sys
 import os
 import types
 
-# Polyfill pkg_resources for Python 3.12 / Vercel runtime if setuptools is not loaded
+# Robust pkg_resources polyfill for Python 3.12 / Vercel runtime
 try:
     import pkg_resources
+    if not hasattr(pkg_resources, 'DistributionNotFound'):
+        class DummyDistributionNotFound(Exception):
+            pass
+        pkg_resources.DistributionNotFound = DummyDistributionNotFound
 except ImportError:
+    class DummyDistributionNotFound(Exception):
+        pass
+
     class DummyDistribution:
         version = "1.4.2"
-    
+
     pkg_resources = types.ModuleType("pkg_resources")
+    pkg_resources.DistributionNotFound = DummyDistributionNotFound
     pkg_resources.get_distribution = lambda name: DummyDistribution()
     sys.modules["pkg_resources"] = pkg_resources
 
