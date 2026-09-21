@@ -55,6 +55,8 @@ if db_url:
     # Fix legacy postgres:// scheme to postgresql:// for SQLAlchemy
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
+    import re
+    db_url = re.sub(r"(?i)[?&]pgbouncer=[^&]+", "", db_url)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['UPLOAD_FOLDER'] = '/tmp/static/uploads' if IS_VERCEL else 'static/uploads'
 elif IS_VERCEL:
